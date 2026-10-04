@@ -1,0 +1,12 @@
+[project]
+name = "product-scanner-backend"
+version = "0.1.0"
+description = "Backend API for Product Scanner"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+]
+
+[tool.uv]
+package = false
