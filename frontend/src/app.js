@@ -1,6 +1,8 @@
 import { createScannerState } from "./scanner-state.js";
 
 const scanner = createScannerState();
+
+// Cache all DOM targets once so render() can stay deterministic and fast.
 const elements = {
   fileInput: document.querySelector("#product-image"),
   dropzone: document.querySelector("#dropzone-image"),
@@ -30,15 +32,36 @@ const elements = {
   workflowSteps: document.querySelectorAll(".workflow-item"),
 };
 
+/**
+ * Formats a byte count for compact display beside the image preview.
+ *
+ * @param {number} bytes File size in bytes.
+ * @returns {string} Human-readable size in KB or MB.
+ */
 function formatBytes(bytes) {
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+/**
+ * Small wrapper for toggling visibility through the semantic hidden attribute.
+ *
+ * @param {HTMLElement} element Element whose visibility should change.
+ * @param {boolean} hidden Whether the element should be hidden.
+ */
 function setHidden(element, hidden) {
   element.hidden = hidden;
 }
 
+/**
+ * Reconciles the full scanner UI from the current state snapshot.
+ *
+ * The renderer is intentionally pure with respect to scanner state: event
+ * handlers mutate the store, then this function updates DOM classes, disabled
+ * states, status text, and preview/result content in one pass.
+ *
+ * @param {import("./scanner-state.js").ScannerState} state Current scanner state.
+ */
 function render(state) {
   const showPreview =
     state.uploadStatus === "success" && state.scanStatus !== "not-started";
@@ -133,12 +156,19 @@ function render(state) {
   });
 }
 
+/**
+ * Pulls the first file from the native picker and hands it to the store.
+ *
+ * The input value is cleared so choosing the same file again still fires a
+ * change event in browsers that otherwise suppress duplicate selections.
+ */
 function selectFromInput() {
   const file = elements.fileInput.files?.[0];
   void scanner.selectFile(file);
   elements.fileInput.value = "";
 }
 
+// File-picker entry points share the same hidden input for accessibility.
 elements.chooseImage.addEventListener("click", () =>
   elements.fileInput.click(),
 );
@@ -146,6 +176,8 @@ elements.changeImage.addEventListener("click", () =>
   elements.fileInput.click(),
 );
 elements.fileInput.addEventListener("change", selectFromInput);
+
+// Primary workflow controls delegate state transitions to the scanner store.
 elements.proceed.addEventListener("click", () => scanner.proceed());
 elements.scan.addEventListener("click", () => void scanner.scan());
 elements.findProduct.addEventListener("click", () =>
@@ -155,23 +187,33 @@ elements.aboutProduct.addEventListener("click", () =>
   scanner.chooseAction("about"),
 );
 
+// Drag-and-drop support mirrors the file input path while showing hover state.
 elements.dropzone.addEventListener("dragenter", (event) => {
   event.preventDefault();
   elements.dropzone.classList.add("dragging");
 });
+
+// Required so the browser allows dropping files onto the custom dropzone.
 elements.dropzone.addEventListener("dragover", (event) =>
   event.preventDefault(),
 );
+
+// Clear drag styling only when the pointer leaves the dropzone itself.
 elements.dropzone.addEventListener("dragleave", (event) => {
   if (event.currentTarget === event.target)
     elements.dropzone.classList.remove("dragging");
 });
+
+// Route the first dropped file through the same validation path as the picker.
 elements.dropzone.addEventListener("drop", (event) => {
   event.preventDefault();
   elements.dropzone.classList.remove("dragging");
   void scanner.selectFile(event.dataTransfer.files?.[0]);
 });
 
+// Initial render keeps SSR/static markup and JavaScript-enhanced state aligned.
 scanner.subscribe(render);
 render(scanner.getState());
+
+// Release object URLs when the page is unloaded or moved into bfcache.
 window.addEventListener("pagehide", () => scanner.dispose(), { once: true });

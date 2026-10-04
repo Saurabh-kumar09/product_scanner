@@ -11,12 +11,14 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Product Scanner" />
     <meta name="twitter:description" content="A closer look at the things you find." />
+    <!-- Static assets load directly because the app is a lightweight module page. -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="stylesheet" href="./src/index.css" />
     <title>Product Scanner</title>
   </head>
   <body>
     <div class="scanner-page">
+      <!-- Top navigation identifies the product and keeps the page chrome minimal. -->
       <header class="topbar">
         <div class="brand" aria-label="Looksee Product Scanner">
           <span class="brand-mark">
@@ -31,14 +33,17 @@
       </header>
 
       <main class="main-wrap">
+        <!-- Intro copy frames the scanner workflow before the interactive panels. -->
         <section class="intro" aria-labelledby="page-title">
           <div class="eyebrow">Product discovery, made simple</div>
           <h1 id="page-title">See something.<br /><em>Know more.</em></h1>
           <p>Start with a photo. We’ll help you figure out what it is and where to look next.</p>
         </section>
 
+        <!-- Main scanner workspace pairs upload controls with preview/result output. -->
         <section class="workspace" aria-label="Product scanner">
           <div class="panel upload-panel">
+            <!-- Upload step header mirrors the workflow indicator below. -->
             <div class="panel-heading">
               <div>
                 <div class="step-label">Step 01 · Your photo</div>
@@ -47,6 +52,7 @@
               <span class="step-count">01 / 03</span>
             </div>
 
+            <!-- Dropzone wraps the native file input so click and drag flows share validation. -->
             <div class="dropzone" id="dropzone-image" data-testid="dropzone-image">
               <input
                 class="file-input"
@@ -75,6 +81,7 @@
               <span class="file-types">JPG · PNG · WEBP · GIF</span>
             </div>
 
+            <!-- Polite live region reports upload validation without interrupting the user. -->
             <div class="upload-state idle" id="status-upload" role="status" aria-live="polite" data-testid="status-upload">
               <svg class="status-icon status-check" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" hidden>
                 <path d="m5 12 4 4L19 6" />
@@ -87,6 +94,7 @@
               <span id="upload-message">Choose an image to begin.</span>
             </div>
 
+            <!-- Upload actions switch from proceed to change-photo after preview is active. -->
             <div class="upload-actions">
               <div class="privacy-note">
                 <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -113,6 +121,7 @@
           </div>
 
           <div class="panel result-panel">
+            <!-- Result panel header stays static while the panel body changes by state. -->
             <div class="panel-heading">
               <div>
                 <div class="step-label">Step 02 · Discovery</div>
@@ -122,6 +131,7 @@
             </div>
 
             <div class="result-content">
+              <!-- Empty state is shown until an uploaded image advances to preview. -->
               <div class="result-empty" id="content-empty-preview" data-testid="content-empty-preview">
                 <div class="scan-orbit">
                   <svg viewBox="0 0 24 24" width="31" height="31" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -133,6 +143,7 @@
                 <p>Add a clear photo, then proceed to preview it before the scan.</p>
               </div>
 
+              <!-- Preview state contains image metadata, scan controls, errors, and results. -->
               <div class="preview-state" id="content-image-preview" data-testid="content-image-preview" hidden>
                 <div class="preview-frame">
                   <span class="preview-chip">
@@ -170,6 +181,7 @@
                 </div>
                 <div class="upload-state error" id="status-scan-error" role="alert" data-testid="status-scan-error" hidden></div>
 
+                <!-- Scan result card and action buttons are populated by app.js after scanning. -->
                 <div id="content-scan-result" data-testid="content-scan-result" hidden>
                   <div class="result-card">
                     <div class="result-kicker">
@@ -212,6 +224,7 @@
           </div>
         </section>
 
+        <!-- Workflow progress is updated by app.js using each item's data-step value. -->
         <div class="workflow" aria-label="Product discovery steps" data-testid="workflow-progress">
           <div class="workflow-item active" data-step="upload" data-testid="workflow-step-upload"><span class="workflow-dot"></span><span>Add image</span></div>
           <span class="workflow-line" aria-hidden="true"></span>
@@ -221,6 +234,7 @@
           <span class="workflow-line" aria-hidden="true"></span>
           <div class="workflow-item" data-step="result" data-testid="workflow-step-result"><span class="workflow-dot"></span><span>Explore</span></div>
         </div>
+        <!-- Footer reassurance keeps privacy and account requirements visible after the panels. -->
         <div class="footer-note">
           <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
@@ -230,6 +244,7 @@
         </div>
       </main>
     </div>
+    <!-- Module script owns state transitions and DOM rendering for the scanner workflow. -->
     <script type="module" src="./src/app.js"></script>
   </body>
 </html>
