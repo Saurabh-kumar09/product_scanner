@@ -1,6 +1,8 @@
 import { createScannerState } from "./scanner-state.js";
 
 const scanner = createScannerState();
+const response = await fetch("http://127.0.0.1:8000/abc");
+const data = await response.json();
 
 // Cache all DOM targets once so render() can stay deterministic and fast.
 const elements = {
@@ -51,6 +53,21 @@ function formatBytes(bytes) {
  */
 function setHidden(element, hidden) {
   element.hidden = hidden;
+}
+
+/**
+ * Converts the product-link API response into user-visible feedback text.
+ *
+ * @param {unknown} value JSON value returned by the backend.
+ * @returns {string} Best available display value from the response.
+ */
+function formatProductData(value) {
+  if (value == null) return "";
+  if (typeof value === "string") return value;
+  if (typeof value !== "object") return String(value);
+  if (typeof value.link === "string") return value.link;
+  if (typeof value.message === "string") return value.message;
+  return JSON.stringify(value);
 }
 
 /**
@@ -135,7 +152,7 @@ function render(state) {
   );
   elements.actionFeedback.textContent =
     state.selectedAction === "find"
-      ? "Similar product search is ready for the future product catalog."
+      ? formatProductData(data)
       : state.selectedAction === "about"
         ? "Product details are ready for a future structured response."
         : "";
@@ -180,9 +197,26 @@ elements.fileInput.addEventListener("change", selectFromInput);
 // Primary workflow controls delegate state transitions to the scanner store.
 elements.proceed.addEventListener("click", () => scanner.proceed());
 elements.scan.addEventListener("click", () => void scanner.scan());
-elements.findProduct.addEventListener("click", () =>
-  scanner.chooseAction("find"),
-);
+elements.findProduct.addEventListener("click", async () => {
+  console.log("Find Product clicked");
+
+  scanner.chooseAction("find");
+
+  try {
+    console.log("Calling FastAPI...");
+
+    console.log("Response received:", response);
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    console.log("Product data retrieved:", data);
+  } catch (error) {
+    console.error("Error fetching product link:", error);
+  }
+});
+
 elements.aboutProduct.addEventListener("click", () =>
   scanner.chooseAction("about"),
 );
