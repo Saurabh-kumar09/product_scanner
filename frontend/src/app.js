@@ -30,7 +30,15 @@ const elements = {
   result: document.querySelector("#content-scan-result"),
   resultName: document.querySelector("#text-result-name"),
   resultDescription: document.querySelector("#text-result-description"),
-  actionFeedback: document.querySelector("#status-product-action"),
+  actionResult: document.querySelector("#content-action-result"),
+  actionResultKicker: document.querySelector("#text-action-result-kicker"),
+  actionResultTitle: document.querySelector("#text-action-result-title"),
+  actionResultLoading: document.querySelector("#status-action-result-loading"),
+  actionResultBody: document.querySelector("#content-action-result-body"),
+  actionResultNote: document.querySelector("#text-action-result-note"),
+  actionResultError: document.querySelector("#status-action-result-error"),
+  actionResultErrorText: document.querySelector("#text-action-result-error"),
+  retryAction: document.querySelector("#button-retry-action"),
   workflowSteps: document.querySelectorAll(".workflow-item"),
 };
 
@@ -56,18 +64,229 @@ function setHidden(element, hidden) {
 }
 
 /**
- * Converts the product-link API response into user-visible feedback text.
+ * Converts API field names into readable labels for the action result panel.
  *
- * @param {unknown} value JSON value returned by the backend.
- * @returns {string} Best available display value from the response.
+ * @param {string} key Raw object key from a backend response.
+ * @returns {string} User-facing label for display.
  */
-function formatProductData(value) {
-  if (value == null) return "";
-  if (typeof value === "string") return value;
-  if (typeof value !== "object") return String(value);
-  if (typeof value.link === "string") return value.link;
-  if (typeof value.message === "string") return value.message;
-  return JSON.stringify(value);
+function humanizeKey(key) {
+  const label = String(key)
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/[_-]+/g, " ")
+    .trim();
+  const friendlyLabels = {
+    name: "Product name",
+    description: "Description",
+    link: "Product link",
+    links: "Product links",
+    url: "Product link",
+    urls: "Product links",
+    productlink: "Product link",
+    productlinks: "Product links",
+    message: "Details",
+    text: "Details",
+    confidencelabel: "Match note",
+  };
+  const friendlyLabel = friendlyLabels[label.replace(/\s+/g, "").toLowerCase()];
+  if (friendlyLabel) return friendlyLabel;
+  return label ? label.charAt(0).toUpperCase() + label.slice(1) : "Details";
+}
+
+/**
+ * Accepts only HTTP(S) links before rendering external anchors.
+ *
+ * @param {unknown} value Candidate URL from the action response.
+ * @returns {string | null} Normalized URL href, or null for unsafe/invalid data.
+ */
+function safeExternalUrl(value) {
+  if (typeof value !== "string" || !value.trim()) return null;
+  try {
+    const url = new URL(value, window.location.href);
+    return ["http:", "https:"].includes(url.protocol) ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Normalizes arbitrary action response JSON into display rows and links.
+ *
+ * Backends can return a primitive, object, array of URLs, or array of structured
+ * link objects. This adapter keeps the renderer small and avoids assigning raw
+ * objects directly into the DOM.
+ *
+ * @param {unknown} data Action response payload.
+ * @returns {{ entries: Array<{ label: string, value: string }>, links: Array<{ label: string, href: string, description: string }> }}
+ */
+function normalizeActionData(data) {
+  const entries = [];
+  const links = [];
+
+  /**
+   * Adds a plain label/value row when a response field is not a usable link.
+   *
+   * @param {string} label Display label for the row.
+   * @param {unknown} value Field value to stringify for display.
+   */
+  function addEntry(label, value) {
+    if (value == null || typeof value === "boolean") return;
+    const text =
+      typeof value === "string" || typeof value === "number"
+        ? String(value)
+        : Array.isArray(value)
+          ? value
+              .map((item) =>
+                typeof item === "object" ? JSON.stringify(item) : String(item),
+              )
+              .join(" · ")
+          : JSON.stringify(value);
+    if (text) entries.push({ label, value: text });
+  }
+
+  /**
+   * Adds a safe external link or falls back to a plain entry.
+   *
+   * @param {unknown} value URL string or structured link-like object.
+   * @param {string} fallbackLabel Label to use when the payload has no title.
+   */
+  function addLink(value, fallbackLabel) {
+    const item = typeof value === "string" ? { url: value } : value;
+    const rawUrl =
+      typeof item === "object" && item !== null
+        ? (item.url ?? item.href ?? item.link)
+        : null;
+    const href = safeExternalUrl(rawUrl);
+    if (!href) {
+      addEntry(fallbackLabel, typeof value === "string" ? value : value);
+      return;
+    }
+    const linkLabel =
+      typeof item === "object" && item !== null
+        ? (item.label ?? item.title ?? item.name ?? fallbackLabel)
+        : fallbackLabel;
+    links.push({
+      label: String(linkLabel),
+      href,
+      description:
+        typeof item === "object" &&
+        item !== null &&
+        typeof item.description === "string"
+          ? item.description
+          : "",
+    });
+  }
+
+  /**
+   * Identifies response fields that should be treated as link collections.
+   *
+   * @param {string} key Raw response key.
+   * @returns {boolean} True when the key usually contains links.
+   */
+  function isLinkKey(key) {
+    return /^(links?|urls?|productlinks?|products)$/i.test(key);
+  }
+
+  if (Array.isArray(data)) {
+    data.forEach((item, index) => {
+      if (typeof item === "string" && safeExternalUrl(item)) {
+        addLink(item, `Product link ${index + 1}`);
+      } else if (
+        item &&
+        typeof item === "object" &&
+        (item.url || item.href || item.link)
+      ) {
+        addLink(
+          item,
+          item.label ?? item.title ?? item.name ?? `Product link ${index + 1}`,
+        );
+      } else {
+        addEntry(`Result ${index + 1}`, item);
+      }
+    });
+  } else if (typeof data === "string" || typeof data === "number") {
+    addEntry("Details", data);
+  } else if (data && typeof data === "object") {
+    Object.entries(data).forEach(([key, value]) => {
+      if (key === "source") return;
+      if (isLinkKey(key)) {
+        const values = Array.isArray(value) ? value : [value];
+        values.forEach((link, index) =>
+          addLink(
+            link,
+            values.length > 1
+              ? `${humanizeKey(key)} ${index + 1}`
+              : humanizeKey(key),
+          ),
+        );
+      } else {
+        addEntry(humanizeKey(key), value);
+      }
+    });
+  }
+
+  return { entries, links };
+}
+
+/**
+ * Renders normalized action data into the action-result panel.
+ *
+ * @param {unknown} data Action response payload to render.
+ */
+function renderActionData(data) {
+  const { entries, links } = normalizeActionData(data);
+  const fragment = document.createDocumentFragment();
+
+  entries.forEach(({ label, value }) => {
+    const item = document.createElement("div");
+    item.className = "action-result-item";
+    const itemLabel = document.createElement("p");
+    itemLabel.className = "action-result-item-label";
+    itemLabel.textContent = label;
+    const itemValue = document.createElement("p");
+    itemValue.className = "action-result-item-value";
+    itemValue.textContent = value;
+    item.append(itemLabel, itemValue);
+    fragment.append(item);
+  });
+
+  if (links.length) {
+    const list = document.createElement("ul");
+    list.className = "action-result-links";
+    links.forEach(({ label, href, description }) => {
+      const item = document.createElement("li");
+      item.className = "action-result-link";
+      const copy = document.createElement("div");
+      copy.className = "action-result-link-copy";
+      const title = document.createElement("span");
+      title.className = "action-result-link-title";
+      title.textContent = label;
+      const anchor = document.createElement("a");
+      anchor.href = href;
+      anchor.target = "_blank";
+      anchor.rel = "noopener noreferrer";
+      anchor.textContent = href;
+      anchor.setAttribute("aria-label", `${label}, opens in a new tab`);
+      copy.append(title, anchor);
+      if (description) {
+        const detail = document.createElement("p");
+        detail.className = "action-result-item-value";
+        detail.textContent = description;
+        copy.append(detail);
+      }
+      item.append(copy);
+      list.append(item);
+    });
+    fragment.append(list);
+  }
+
+  if (!entries.length && !links.length) {
+    const empty = document.createElement("p");
+    empty.className = "action-result-item-value";
+    empty.textContent = "The service returned no readable details or links.";
+    fragment.append(empty);
+  }
+
+  elements.actionResultBody.replaceChildren(fragment);
 }
 
 /**
@@ -75,7 +294,7 @@ function formatProductData(value) {
  *
  * The renderer is intentionally pure with respect to scanner state: event
  * handlers mutate the store, then this function updates DOM classes, disabled
- * states, status text, and preview/result content in one pass.
+ * states, live regions, and preview/result/action content in one pass.
  *
  * @param {import("./scanner-state.js").ScannerState} state Current scanner state.
  */
@@ -150,12 +369,31 @@ function render(state) {
     "selected",
     state.selectedAction === "about",
   );
-  elements.actionFeedback.textContent =
+
+  const hasAction = Boolean(state.selectedAction);
+  const isActionLoading = state.actionStatus === "loading";
+  const isActionError = state.actionStatus === "error";
+  const hasActionResult =
+    state.actionStatus === "success" && Boolean(state.actionResult);
+  setHidden(elements.actionResult, !hasAction);
+  elements.actionResult.setAttribute("aria-busy", String(isActionLoading));
+  elements.actionResultKicker.textContent =
+    state.selectedAction === "find" ? "Product search" : "Product information";
+  elements.actionResultTitle.textContent =
     state.selectedAction === "find"
-      ? formatProductData(data)
-      : state.selectedAction === "about"
-        ? "Product details are ready for a future structured response."
-        : "";
+      ? "Matching product links"
+      : "About this item";
+  setHidden(elements.actionResultLoading, !isActionLoading);
+  setHidden(elements.actionResultBody, !hasActionResult);
+  if (hasActionResult) renderActionData(state.actionResult);
+  const isSampleAbout =
+    state.selectedAction === "about" && state.actionResult?.source === "sample";
+  elements.actionResultNote.textContent = isSampleAbout
+    ? "This overview uses the current sample scan information."
+    : "";
+  setHidden(elements.actionResultNote, !isSampleAbout);
+  setHidden(elements.actionResultError, !isActionError);
+  elements.actionResultErrorText.textContent = state.actionError ?? "";
 
   const stage = isScanned
     ? "result"
@@ -197,28 +435,17 @@ elements.fileInput.addEventListener("change", selectFromInput);
 // Primary workflow controls delegate state transitions to the scanner store.
 elements.proceed.addEventListener("click", () => scanner.proceed());
 elements.scan.addEventListener("click", () => void scanner.scan());
-elements.findProduct.addEventListener("click", async () => {
-  console.log("Find Product clicked");
-
-  scanner.chooseAction("find");
-
-  try {
-    console.log("Calling FastAPI...");
-
-    console.log("Response received:", response);
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    console.log("Product data retrieved:", data);
-  } catch (error) {
-    console.error("Error fetching product link:", error);
-  }
-});
-
-elements.aboutProduct.addEventListener("click", () =>
-  scanner.chooseAction("about"),
+elements.findProduct.addEventListener(
+  "click",
+  () => void scanner.chooseAction("find"),
+);
+elements.aboutProduct.addEventListener(
+  "click",
+  () => void scanner.chooseAction("about"),
+);
+elements.retryAction.addEventListener(
+  "click",
+  () => void scanner.chooseAction("find"),
 );
 
 // Drag-and-drop support mirrors the file input path while showing hover state.

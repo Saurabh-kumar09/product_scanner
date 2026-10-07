@@ -1,6 +1,7 @@
 /**
  * @typedef {"idle" | "validating" | "success" | "error"} UploadStatus
  * @typedef {"not-started" | "ready" | "scanning" | "scanned"} ScanStatus
+ * @typedef {"idle" | "loading" | "success" | "error"} ActionStatus
  * @typedef {"find" | "about" | null} ScannerAction
  *
  * @typedef {object} ScanResult
@@ -18,7 +19,15 @@
  * @property {ScanResult | null} result Last scan result payload.
  * @property {string | null} scanError User-facing scan error copy.
  * @property {ScannerAction} selectedAction Post-scan action selected by the user.
+ * @property {ActionStatus} actionStatus Current post-scan action request state.
+ * @property {unknown} actionResult Payload returned by the selected action.
+ * @property {string | null} actionError User-facing action error copy.
  */
+
+/**
+ * Product-link API endpoint, overridable for deployed environments.
+ */
+const PRODUCT_LINK_ENDPOINT = "http://127.0.0.1:8000/abc";
 
 /**
  * Creates a fresh baseline state for resets and first render.
@@ -34,6 +43,9 @@ const initialState = () => ({
   result: null,
   scanError: null,
   selectedAction: null,
+  actionStatus: "idle",
+  actionResult: null,
+  actionError: null,
 });
 
 /**
@@ -86,6 +98,8 @@ export function createScannerState() {
   // Monotonic versions invalidate async work when a newer upload/scan starts.
   let uploadVersion = 0;
   let scanVersion = 0;
+  // Separately invalidates post-scan action requests when the workflow changes.
+  let actionVersion = 0;
   const subscribers = new Set();
 
   /**
@@ -138,6 +152,7 @@ export function createScannerState() {
     async selectFile(file) {
       const currentUpload = ++uploadVersion;
       ++scanVersion;
+      ++actionVersion;
       releasePreview();
 
       if (!file) {
@@ -200,11 +215,15 @@ export function createScannerState() {
       if (state.uploadStatus !== "success" || state.scanStatus !== "ready")
         return;
       const currentScan = ++scanVersion;
+      ++actionVersion;
       update({
         scanStatus: "scanning",
         result: null,
         scanError: null,
         selectedAction: null,
+        actionStatus: "idle",
+        actionResult: null,
+        actionError: null,
       });
 
       try {
@@ -222,13 +241,67 @@ export function createScannerState() {
     },
 
     /**
-     * Records which post-scan action the user selected.
+     * Runs the selected post-scan action and stores its display payload.
+     *
+     * The "about" action reuses the scan result immediately. The "find" action
+     * fetches product-link data and ignores stale responses after retry/new scan.
      *
      * @param {"find" | "about"} action Action identifier from the result buttons.
+     * @returns {Promise<void>}
      */
-    chooseAction(action) {
-      if (state.scanStatus !== "scanned") return;
-      update({ selectedAction: action });
+    async chooseAction(action) {
+      if (state.scanStatus !== "scanned" || !["find", "about"].includes(action))
+        return;
+
+      const currentAction = ++actionVersion;
+      if (action === "about") {
+        update({
+          selectedAction: action,
+          actionStatus: "success",
+          actionResult: state.result,
+          actionError: null,
+        });
+        return;
+      }
+
+      update({
+        selectedAction: action,
+        actionStatus: "loading",
+        actionResult: null,
+        actionError: null,
+      });
+
+      try {
+        const response = await fetch(PRODUCT_LINK_ENDPOINT, {
+          headers: { Accept: "application/json" },
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        const result = await response.json();
+        if (result == null)
+          throw new Error("The product search returned no data.");
+        if (currentAction !== actionVersion || state.selectedAction !== action)
+          return;
+
+        update({
+          actionStatus: "success",
+          actionResult: result,
+          actionError: null,
+        });
+      } catch (error) {
+        if (currentAction !== actionVersion || state.selectedAction !== action)
+          return;
+
+        const httpStatus =
+          error instanceof Error && error.message.match(/^HTTP (\d+)$/)?.[1];
+        update({
+          actionStatus: "error",
+          actionResult: null,
+          actionError: httpStatus
+            ? `Product search is temporarily unavailable (HTTP ${httpStatus}). Please try again.`
+            : "We couldn't connect to product search. Make sure its API is running, then try again.",
+        });
+      }
     },
 
     /**
@@ -237,6 +310,7 @@ export function createScannerState() {
     dispose() {
       ++uploadVersion;
       ++scanVersion;
+      ++actionVersion;
       releasePreview();
       subscribers.clear();
     },

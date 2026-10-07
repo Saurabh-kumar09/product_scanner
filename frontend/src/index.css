@@ -161,7 +161,34 @@ button:focus-visible, input:focus-visible, label:focus-visible {
 .action-copy { display: flex; flex-direction: column; gap: 4px; }
 .action-copy strong { font-size: 11px; letter-spacing: -.02em; }
 .action-copy small { font-size: 9px; color: hsl(var(--muted-foreground)); line-height: 1.3; }
-.action-feedback { min-height: 16px; margin-top: 10px; font-size: 11px; color: hsl(var(--primary)); }
+
+/* Action result panel displays post-scan search/about payloads and retry errors. */
+.action-result {
+  width: min(100%, 820px); margin: 20px auto 0; padding: 15px;
+  border: 1px solid hsl(var(--primary) / .2);
+  border-radius: 12px; background: hsl(161 30% 96%);
+  animation: rise .25s ease both;
+}
+.action-result-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.action-result-kicker { color: hsl(var(--primary)); font: 500 9px var(--app-font-mono); letter-spacing: .1em; text-transform: uppercase; }
+.action-result-heading h3 { margin: 5px 0 0; font-size: 16px; letter-spacing: -.035em; }
+.action-result-mark { display: grid; place-items: center; width: 29px; height: 29px; flex: none; color: hsl(var(--primary)); background: hsl(var(--primary) / .09); border-radius: 8px; font-size: 16px; }
+.action-result-loading { display: flex; align-items: center; gap: 9px; margin: 14px 0 0; color: hsl(var(--muted-foreground)); font-size: 12px; }
+.action-result-loading .scanning-line { flex: none; }
+.action-result-body { display: grid; gap: 9px; margin-top: 13px; }
+.action-result-item { min-width: 0; padding: 10px 11px; border: 1px solid hsl(var(--foreground) / .08); border-radius: 9px; background: hsl(var(--card)); }
+.action-result-item-label { margin: 0 0 4px; color: hsl(var(--muted-foreground)); font: 10px var(--app-font-mono); letter-spacing: .04em; text-transform: uppercase; }
+.action-result-item-value { margin: 0; color: hsl(var(--foreground)); font-size: 12px; line-height: 1.55; overflow-wrap: anywhere; }
+.action-result-links { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.action-result-link { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 11px 12px; border: 1px solid hsl(var(--primary) / .18); border-radius: 9px; background: hsl(var(--card)); }
+.action-result-link-copy { min-width: 0; }
+.action-result-link-title { display: block; margin-bottom: 4px; color: hsl(var(--foreground)); font-size: 12px; font-weight: 700; }
+.action-result-link a { display: block; color: hsl(var(--primary)); font-size: 11px; line-height: 1.5; text-decoration-thickness: 1px; text-underline-offset: 3px; overflow-wrap: anywhere; }
+.action-result-link a:hover { color: hsl(161 47% 25%); }
+.action-result-error { margin-top: 12px; padding: 11px 12px; border: 1px solid hsl(var(--destructive) / .2); border-radius: 9px; background: hsl(var(--destructive) / .05); }
+.action-result-error p { margin: 0; color: hsl(var(--destructive)); font-size: 12px; line-height: 1.5; }
+.action-retry { margin-top: 9px; padding: 0; border: 0; background: transparent; color: hsl(var(--primary)); font-size: 11px; font-weight: 700; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.action-retry:hover { color: hsl(161 47% 25%); }
 
 /* Workflow and footer communicate the current scanner step without extra script. */
 .workflow { display: flex; justify-content: center; align-items: center; gap: 0; margin: 27px 0 0; color: hsl(var(--muted-foreground)); }

@@ -224,6 +224,27 @@
           </div>
         </section>
 
+        <!-- Post-scan action output is populated by app.js for search/about results. -->
+        <section class="action-result" id="content-action-result" role="region" aria-labelledby="text-action-result-title" aria-live="polite" hidden data-testid="content-action-result">
+          <div class="action-result-heading">
+            <div>
+              <div class="action-result-kicker" id="text-action-result-kicker"></div>
+              <h3 id="text-action-result-title"></h3>
+            </div>
+            <span class="action-result-mark" aria-hidden="true">↗</span>
+          </div>
+          <p class="action-result-loading" id="status-action-result-loading" role="status" hidden>
+            <span class="scanning-line" aria-hidden="true"></span>
+            Finding useful product information…
+          </p>
+          <div class="action-result-body" id="content-action-result-body" hidden></div>
+          <p class="action-result-note" id="text-action-result-note" hidden></p>
+          <div class="action-result-error" id="status-action-result-error" role="alert" hidden>
+            <p id="text-action-result-error"></p>
+            <button type="button" class="action-retry" id="button-retry-action">Try again</button>
+          </div>
+        </section>
+
         <!-- Workflow progress is updated by app.js using each item's data-step value. -->
         <div class="workflow" aria-label="Product discovery steps" data-testid="workflow-progress">
           <div class="workflow-item active" data-step="upload" data-testid="workflow-step-upload"><span class="workflow-dot"></span><span>Add image</span></div>
